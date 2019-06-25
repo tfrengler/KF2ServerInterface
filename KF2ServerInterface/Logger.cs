@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.IO;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace KF2ServerInterface
@@ -12,40 +12,50 @@ namespace KF2ServerInterface
     {
         public static string FileName { get; } = "log.html";
 
-        public static void LogToFile(string fileName, string[] output)
+        public static void LogToFile(string output)
         {
+            FileStream fileStream;
+            StreamWriter outputFile;
 
+            if (!File.Exists(FileName))
+                fileStream = new FileStream(FileName, FileMode.CreateNew);
+            else
+                fileStream = new FileStream(FileName, FileMode.Append);
+
+            outputFile = new StreamWriter(fileStream, Encoding.UTF8);
+            outputFile.WriteLine(output + Environment.NewLine);
+
+            outputFile.Dispose();
+            fileStream.Dispose();
         }
 
-        public static void DumpContentHeaders(HttpContentHeaders headers)
+        public static void DumpHttpHeaders(HttpResponseMessage httpResponse)
         {
-            Console.WriteLine($"CONTENT HEADER DUMP ({headers.Count()}):--------------------------------");
-            foreach (KeyValuePair<string, IEnumerable<string>> header in headers)
-            {
-                Console.WriteLine($"{header.Key}: {string.Join(" ", header.Value)}");
-            }
-            Console.WriteLine("END DUMP:--------------------------------");
-        }
+            StringBuilder output = new StringBuilder();
+            output.Append("------------HTTP HEADERS------------");
 
-        public static void DumpResponseHeaders(HttpHeaders headers)
-        {
-            Console.WriteLine($"RESPONSE HEADER DUMP ({headers.Count()}):--------------------------------");
-            foreach (KeyValuePair<string, IEnumerable<string>> header in headers)
+            foreach (KeyValuePair<string, IEnumerable<string>> responseHeader in httpResponse.Headers)
             {
-                Console.WriteLine($"{header.Key}: {string.Join(" ", header.Value)}");
+                output.Append($"<p>{responseHeader.Key}: {string.Join(" ", responseHeader.Value)}</p>");
             }
-            Console.WriteLine("END DUMP:--------------------------------");
+            foreach (KeyValuePair<string, IEnumerable<string>> contentHeader in httpResponse.Content.Headers)
+            {
+                output.Append($"<p>{contentHeader.Key}: {string.Join(" ", contentHeader.Value)}</p>");
+            }
+
+            output.Append("------------END--------------------");
+            LogToFile(output.ToString());
         }
 
         public static void DumpResponseContent(HttpContent content)
         {
-            Console.WriteLine("CONTENT DUMP:--------------------------------");
-
             Task<string> responseBody = content.ReadAsStringAsync();
             while (!responseBody.IsCompleted) ;
-            Console.WriteLine(responseBody.Result);
 
-            Console.WriteLine("END DUMP:--------------------------------");
+            string output = Regex.Replace(responseBody.Result, "<", "&lt;");
+            output = Regex.Replace(output, ">", "&gt;");
+
+            LogToFile((output.Length > 0 ? $"<pre>{output}</pre>" : "<empty body>"));
         }
     }
 }

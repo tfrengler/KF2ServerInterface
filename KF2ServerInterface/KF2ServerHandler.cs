@@ -62,34 +62,36 @@ namespace KF2ServerInterface
             HttpResponseMessage response = await SendGetRequest(serverAddress, port, INFO_PAGE);
             string[] match = await GetContentBodyMatch(response.Content, "<form id=\"loginform\"");
 
+#if DEBUG
+            Logger.DumpHttpHeaders(response);
+            Logger.DumpResponseContent(response.Content);
+            Logger.LogToFile("STATUS CODE: " + response.StatusCode.ToString());
+#endif
+
             if (match.Length == 0)
                 return true;
 
             return false;
         }
-        /*
-        public async Task<string> GetLoginToken(Uri serverAddress)
+
+        public async Task<string> GetLoginToken(string serverAddress, int port)
         {
-            HttpResponseMessage loginPageResponse = await this.SendGetRequest(serverAddress);
+            HttpResponseMessage loginPageResponse = await this.SendGetRequest(serverAddress, port, LOGIN_PAGE);
             if (loginPageResponse.StatusCode != HttpStatusCode.OK) return "";
 
-            string sessionID = this.GetHeaderValue(loginPageResponse.Headers, "Set-Cookie", "sessionid");
-            if (sessionID.Length == 0) return "";
+            string[] loginToken = await GetContentBodyMatch(loginPageResponse.Content, "name=\"token\" value=\"(.*)\"");
 
-            string responseBody = await loginPageResponse.Content.ReadAsStringAsync();
+            if (loginToken.Length > 0)
+                return loginToken[1];
 
-            Match tokenSearch = new Regex("name=\"token\" value=\"(.*)\"").Match(responseBody);
-            if (!tokenSearch.Success) return "";
-
-            this.cookies.Add(serverAddress, new Cookie("sessionid", sessionID));
-            return tokenSearch.Groups[1].Value;
+            return "";
         }
-        */
-        public async Task<bool> Login(string serverAddress, int port, /*string token, */string username, string password)
+
+        public async Task<bool> Login(string serverAddress, int port, string token, string username, string password)
         {
             Dictionary<string, string> postData = new Dictionary<string, string>
             {
-                /*{ "token", token },*/
+                { "token", token },
                 { "password_hash", "" },
                 { "username", username },
                 { "password", password },
@@ -98,18 +100,25 @@ namespace KF2ServerInterface
 
             HttpResponseMessage loginResponse = await SendPostRequest(serverAddress, port, postData, LOGIN_PAGE);
 #if DEBUG
-            Logger.DumpResponseHeaders(loginResponse.Headers);
-            Logger.DumpContentHeaders(loginResponse.Content.Headers);
+            Logger.DumpHttpHeaders(loginResponse);
             Logger.DumpResponseContent(loginResponse.Content);
+            Logger.LogToFile("STATUS CODE: " + loginResponse.StatusCode.ToString());
 #endif
-            if (loginResponse.StatusCode != HttpStatusCode.OK)
+            if (loginResponse.StatusCode != HttpStatusCode.Redirect)
+            {
+                Logger.LogToFile($"Login(): Status code was not Redirect as expected but rather {loginResponse.StatusCode.ToString()}");
                 return false;
+            }
             string authToken = this.GetHeaderValue(loginResponse.Headers, "Set-Cookie", "authcred");
 
             if (authToken.Length == 0)
+            {
+                Logger.LogToFile($"Login(): No authcred cookie received after login attempt");
                 return false;
+            }
 
             cookies.Add(new Uri(serverAddress + ":" + port), new Cookie("authcred", authToken));
+            Logger.LogToFile($"Login(): Login successful. Authcred received: {authToken}");
             return true;
         }
         /*
