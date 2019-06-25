@@ -8,65 +8,46 @@ namespace KF2ServerInterface
 {
     class Program
     {
-        const string GLOBAL_DESIRED_MAP = "KF-SteamFortress";
-        const string SERVER_ADDRESS = "http://192.168.1.222";
-        const int CHECK_INTERVAL = 300000;
+        public const string GLOBAL_DESIRED_MAP = "KF-SteamFortress";
+        public const string SERVER_ADDRESS = "http://80.101.134.182"; //192.168.1.222
+        private const int CHECK_INTERVAL = 300000;
 
         static void Main(string[] args)
         {
             KF2ServerHandler KF2Server = new KF2ServerHandler();
-            KF2ServerHandler.Server[] servers = new KF2ServerHandler.Server[5];
+            KF2ServerInstance[] servers = new KF2ServerInstance[6];
 
             #region SERVER INSTANCES
-            servers.SetValue(new KF2ServerHandler.Server
-            {
-                name = "PRIVATE",
-                gamemode = "KFGameContent.KFGameInfo_Endless",
-                address = new Uri(Program.SERVER_ADDRESS + ":8000/ServerAdmin/"),
-                configDir = "Private",
-                desiredMap = Program.GLOBAL_DESIRED_MAP
-            }, 0);
-
-            servers.SetValue(new KF2ServerHandler.Server
-            {
-                name = "HARD",
-                gamemode = "KFGameContent.KFGameInfo_Survival",
-                address = new Uri(Program.SERVER_ADDRESS + ":8001/ServerAdmin/"),
-                configDir = "Hard",
-                desiredMap = Program.GLOBAL_DESIRED_MAP
-            }, 1);
-
-            servers.SetValue(new KF2ServerHandler.Server
-            {
-                name = "SUICIDAL",
-                gamemode = "KFGameContent.KFGameInfo_Survival",
-                address = new Uri(Program.SERVER_ADDRESS + ":8002/ServerAdmin/"),
-                configDir = "Suicidal",
-                desiredMap = Program.GLOBAL_DESIRED_MAP
-            }, 2);
-
-            servers.SetValue(new KF2ServerHandler.Server
-            {
-                name = "HELL ON EARTH",
-                gamemode = "KFGameContent.KFGameInfo_Survival",
-                address = new Uri(Program.SERVER_ADDRESS + ":8003/ServerAdmin/"),
-                configDir = "HoE",
-                desiredMap = Program.GLOBAL_DESIRED_MAP
-            }, 3);
-
-            servers.SetValue(new KF2ServerHandler.Server
-            {
-                name = "WEEKLY",
-                gamemode = "KFGameContent.KFGameInfo_Weekly",
-                address = new Uri(Program.SERVER_ADDRESS + ":8004/ServerAdmin/"),
-                configDir = "Weekly",
-                desiredMap = Program.GLOBAL_DESIRED_MAP
-            }, 4);
+            servers.SetValue(new KF2ServerInstance("PRIVATE", 8000, "Endless", "Private", Program.GLOBAL_DESIRED_MAP), 0);
+            servers.SetValue(new KF2ServerInstance("HARD", 8001, "Survival", "Hard", Program.GLOBAL_DESIRED_MAP), 1);
+            servers.SetValue(new KF2ServerInstance("SUICIDAL", 8002, "Survival", "Suicidal", Program.GLOBAL_DESIRED_MAP), 2);
+            servers.SetValue(new KF2ServerInstance("HELL ON EARTH", 8003, "Survival", "HoE", Program.GLOBAL_DESIRED_MAP), 3);
+            servers.SetValue(new KF2ServerInstance("WEEKLY", 8004, "WeeklySurvival", "Weekly", Program.GLOBAL_DESIRED_MAP), 4);
+            servers.SetValue(new KF2ServerInstance("OBJECTIVE", 8005, "Objective", "ObjectiveHard", Program.GLOBAL_DESIRED_MAP), 5);
             #endregion
 
+            Task<bool> serverUp = KF2Server.IsServerResponding(SERVER_ADDRESS, servers[3].Port);
+            while (!serverUp.IsCompleted) ;
+            Console.WriteLine("IS SERVER RESPONDING:" + serverUp.Result);
+
+            Task<bool> haveSession = KF2Server.AreWeAuthenticated(SERVER_ADDRESS, servers[3].Port);
+            while (!haveSession.IsCompleted) ;
+            Console.WriteLine("ARE WE AUTHENTICATED: " + haveSession.Result);
+
+            Task<string> sessionID = KF2Server.GetSessionID(SERVER_ADDRESS, servers[3].Port);
+            while (!sessionID.IsCompleted) ;
+            Console.WriteLine($"DO WE HAVE A NEW SESSION ID: {sessionID.Result.Length > 0}");
+
+            Task<bool> login = KF2Server.Login(SERVER_ADDRESS, servers[3].Port, "admin", "ThomaS_86954494?");
+            while (!login.IsCompleted) ;
+            Console.WriteLine($"LOGGED IN: {login.Result}");
+
+            Console.WriteLine("Press any key to exit...");
+            Console.ReadKey();
+            /*
             while (true)
             {
-                foreach (KF2ServerHandler.Server currentServer in servers)
+                foreach (KF2ServerHandler.ServerInstance currentServer in servers)
                 {
                     Console.WriteLine($"---------------------CHECKING SERVER: {currentServer.name}");
 
@@ -109,24 +90,23 @@ namespace KF2ServerInterface
                     if (playerCount == 0 && currentMap != currentServer.desiredMap)
                     {
                         Console.WriteLine($"Server is empty and not on the right map ({currentMap}). Switching to: {currentServer.desiredMap}" + Environment.NewLine);
-                        /*
+                        
                         Task<bool> mapSwitchTask = KF2Server.SwitchMap(currentServer.desiredMap, currentServer);
                         while (!mapSwitchTask.IsCompleted) ;
 
                         if (mapSwitchTask.Result)
                             Console.WriteLine("Map switch successful");
-                        */
+                        
                     }
                     else
                     {
                         Console.WriteLine($"Server has {playerCount} players on map {currentMap}, doing nothing" + Environment.NewLine);
                     }
                 }
-
                 Console.WriteLine($"Waiting... ({Program.CHECK_INTERVAL / 1000} seconds)");
                 Console.WriteLine("-------------------------------------------------------------" + Environment.NewLine);
                 Thread.Sleep(Program.CHECK_INTERVAL);
-            }
+            }*/
         }
     }
 }

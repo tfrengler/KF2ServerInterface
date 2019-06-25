@@ -43,8 +43,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="KF2ServerHandler.cs" />
+    <Compile Include="Logger.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="KF2ServerInstance.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

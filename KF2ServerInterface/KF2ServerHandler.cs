@@ -1,4 +1,6 @@
-﻿using System;
+﻿#define DEBUG
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -13,60 +15,59 @@ namespace KF2ServerInterface
     {
         #region PROPERTIES
         private readonly CookieContainer cookies;
-        private readonly HttpClientHandler handler;
-        private readonly HttpClient httpClient;
+        private readonly HttpClient client;
 
-        public struct Server
-        {
-            public string name;
-            public Uri address;
-            public string gamemode;
-            public string configDir;
-            public string desiredMap;
-        }
+        private const string LOGIN_PAGE = "/ServerAdmin/";
+        private const string CHANGE_PAGE = "/ServerAdmin/current/change";
+        private const string INFO_PAGE = "/ServerAdmin/current/info";
 
-        public string[] maps { get; } = new string[]
-        {
-            "KF-Airship",
-            "KF-BioticsLab",
-            "KF-BlackForest",
-            "KF-BurningParis",
-            "KF-Catacombs",
-            "KF-ContainmentStation",
-            "KF-DieSector",
-            "KF-EvacuationPoint",
-            "KF-Farmhouse",
-            "KF-HostileGrounds",
-            "KF-InfernalRealm",
-            "KF-KrampusLair",
-            "KF-Lockdown",
-            "KF-MonsterBall",
-            "KF-Nightmare",
-            "KF-Nuked",
-            "KF-Outpost",
-            "KF-PowerCore_Holdout",
-            "KF-Prison",
-            "KF-SantasWorkshop",
-            "KF-ShoppingSpree",
-            "KF-Spillway",
-            "KF-SteamFortress",
-            "KF-TheDescent",
-            "KF-TragicKingdom",
-            "KF-VolterManor",
-            "KF-ZedLanding"
-        };
+        public string SessionID { get; private set; } = "";
+        public string AuthToken { get; private set; } = "";
+
         #endregion
 
-        //CONSTRUCTOR
+        /// <summary>Returns an instance of the handler for the KF2 server instances</summary>
         public KF2ServerHandler()
         {
             this.cookies = new CookieContainer();
-            this.handler = new HttpClientHandler();
-            this.handler.AllowAutoRedirect = false;
-            this.handler.CookieContainer = cookies;
-            this.httpClient = new HttpClient(handler);
+            HttpClientHandler handler = new HttpClientHandler();
+            handler.AllowAutoRedirect = false;
+            handler.CookieContainer = cookies;
+            this.client = new HttpClient(handler);
         }
 
+        #region PUBLIC METHODS
+        public async Task<string> GetSessionID(string serverAddress, int port)
+        {
+            HttpResponseMessage serverResponse = await SendGetRequest(serverAddress, port, LOGIN_PAGE);
+            string sessionID = GetHeaderValue(serverResponse.Headers, "Set-Cookie", "sessionid");
+
+            if (sessionID.Length > 0)
+                return sessionID;
+
+            return "";
+        }
+
+        public async Task<bool> IsServerResponding(string serverAddress, int port)
+        {
+            HttpResponseMessage serverResponse = await SendGetRequest(serverAddress, port, LOGIN_PAGE);
+            if (serverResponse.IsSuccessStatusCode || serverResponse.StatusCode == HttpStatusCode.Redirect)
+                return true;
+
+            return false;
+        }
+
+        public async Task<bool> AreWeAuthenticated(string serverAddress, int port)
+        {
+            HttpResponseMessage response = await SendGetRequest(serverAddress, port, INFO_PAGE);
+            string[] match = await GetContentBodyMatch(response.Content, "<form id=\"loginform\"");
+
+            if (match.Length == 0)
+                return true;
+
+            return false;
+        }
+        /*
         public async Task<string> GetLoginToken(Uri serverAddress)
         {
             HttpResponseMessage loginPageResponse = await this.SendGetRequest(serverAddress);
@@ -83,45 +84,55 @@ namespace KF2ServerInterface
             this.cookies.Add(serverAddress, new Cookie("sessionid", sessionID));
             return tokenSearch.Groups[1].Value;
         }
-
-        public async Task<string> Login(Uri serverAddress, string token, string username, string password)
+        */
+        public async Task<bool> Login(string serverAddress, int port, /*string token, */string username, string password)
         {
             Dictionary<string, string> postData = new Dictionary<string, string>
             {
-                { "token", token },
+                /*{ "token", token },*/
                 { "password_hash", "" },
                 { "username", username },
                 { "password", password },
                 { "remember", "-1" }
             };
 
-            HttpResponseMessage loginResponse = await this.SendPostRequest(serverAddress, postData);
-            if (loginResponse.StatusCode != HttpStatusCode.OK) return "";
+            HttpResponseMessage loginResponse = await SendPostRequest(serverAddress, port, postData, LOGIN_PAGE);
+#if DEBUG
+            Logger.DumpResponseHeaders(loginResponse.Headers);
+            Logger.DumpContentHeaders(loginResponse.Content.Headers);
+            Logger.DumpResponseContent(loginResponse.Content);
+#endif
+            if (loginResponse.StatusCode != HttpStatusCode.OK)
+                return false;
             string authToken = this.GetHeaderValue(loginResponse.Headers, "Set-Cookie", "authcred");
 
             if (authToken.Length == 0)
-                return "";
+                return false;
 
-            this.cookies.Add(serverAddress, new Cookie("authcred", authToken));
-            return authToken;
+            cookies.Add(new Uri(serverAddress + ":" + port), new Cookie("authcred", authToken));
+            return true;
+        }
+        /*
+        private void DumpCookies(Uri serverAddress)
+        {
+            Console.WriteLine("COOKIE DUMP:--------------------------------");
+
+            foreach (Cookie cookie in this.cookies.GetCookies(serverAddress))
+                Console.WriteLine($"{cookie.Name}: {cookie.Value}");
+
+            Console.WriteLine("END DUMP:--------------------------------");
         }
 
-        private async void DumpResponseHeadersAndBody(HttpResponseMessage response)
-        {
-            foreach (KeyValuePair<string, IEnumerable<string>> header in response.Content.Headers)
-            {
-                Console.WriteLine($"{header.Key}: {String.Join(" ", header.Value)}");
-            }
-            string responseBody = await response.Content.ReadAsStringAsync();
-            Console.WriteLine(responseBody);
-        }
+        
 
-        private void ClearSessionData(Uri address)
+        public void RotateSession(string serverAddress, string newSessionID)
         {
-            foreach (Cookie cookie in this.cookies.GetCookies(address))
+            foreach (Cookie cookie in this.cookies.GetCookies(new Uri(serverAddress)))
                 cookie.Expired = true;
-        }
 
+            this.cookies.Add(new Uri(serverAddress), new Cookie("sessionid", newSessionID));
+        }
+        /*
         public async Task<int> GetPlayerCount(Uri serverAddress)
         {
             HttpResponseMessage infoPageResponse = await this.SendGetRequest(new Uri(serverAddress + "current/info"));
@@ -152,28 +163,26 @@ namespace KF2ServerInterface
             return currentMapSearch.Groups[1].Value;
         }
 
-        public async Task<bool> SwitchMap(string mapName, Server serverInstance)
+        public async Task<bool> SwitchMap(string mapName, KF2ServerInstance server)
         {
-            if (!this.maps.Contains(mapName)) return false;
-
             Dictionary<string, string> postData = new Dictionary<string, string>
             {
-                { "gametype", serverInstance.gamemode },
+                { "gametype", server.gamemode },
                 { "map", mapName },
                 { "mutatorGroupCount", "0" },
-                { "urlextra", $"?ConfigSubDir={serverInstance.configDir}" },
+                { "urlextra", $"?ConfigSubDir={server.configDir}" },
                 { "action", "change" }
             };
 
-            HttpResponseMessage httpResponse = await this.SendPostRequest(new Uri(serverInstance.address + "current/change"), postData);
+            HttpResponseMessage httpResponse = await this.SendPostRequest(new Uri(server.address + "current/change"), postData);
             if (httpResponse.StatusCode != HttpStatusCode.OK) return false;
 
             string newSessionID = this.GetHeaderValue(httpResponse.Headers, "Set-Cookie", "sessionid");
 
             if (newSessionID.Length > 0)
             {
-                this.ClearSessionData(serverInstance.address);
-                this.cookies.Add(serverInstance.address, new Cookie("sessionid", newSessionID));
+                this.ClearSessionData(server.address);
+                this.cookies.Add(server.address, new Cookie("sessionid", newSessionID));
             }
 
             string responseBody = await httpResponse.Content.ReadAsStringAsync();
@@ -184,51 +193,85 @@ namespace KF2ServerInterface
 
             return false;
         }
+        */
+#endregion
 
-        private async Task<HttpResponseMessage> SendGetRequest(Uri address)
+#region PRIVATE METHODS
+        private async Task<HttpResponseMessage> SendGetRequest(string serverAddress, int port, string appendPath = "")
         {
-            HttpResponseMessage httpResponse;
+            Console.WriteLine($"Sending GET request to: {serverAddress}:{port}{appendPath}");
 
-            try { 
-                httpResponse = await httpClient.GetAsync(address);
-                return httpResponse;
+            HttpRequestMessage httpRequest = new HttpRequestMessage(HttpMethod.Get, new Uri($"{serverAddress}:{port}{appendPath}"));
+            //httpRequest.Headers.Add("host", "KF2ServerHandler");
+            HttpResponseMessage returnData;
+
+            try {
+                returnData = await client.SendAsync(httpRequest);
             }
             catch(HttpRequestException error) {
-                Console.WriteLine($"ERROR: Sending GET request to {address} failed");
-                Console.WriteLine(error.Message);
-                return new HttpResponseMessage(HttpStatusCode.InternalServerError);
+                Console.WriteLine($"ERROR: Sending GET request to {serverAddress}:{port}{appendPath} || {error.Message}");
+                returnData = new HttpResponseMessage(HttpStatusCode.InternalServerError);
             };
+
+            return returnData;
         }
 
-        private async Task<HttpResponseMessage> SendPostRequest(Uri address, Dictionary<string, string> postData)
+        private async Task<HttpResponseMessage> SendPostRequest(string serverAddress, int port, Dictionary<string, string> postData, string appendPath = "")
         {
-            HttpResponseMessage httpResponse;
             HttpContent formData = new FormUrlEncodedContent(postData);
+            //formData.Headers.Add("host", "KF2ServerHandler");
+            HttpResponseMessage returnData;
+
             try
             {
-                httpResponse = await httpClient.PostAsync(address, formData);
-                return httpResponse;
+                returnData = await client.PostAsync(new Uri($"{serverAddress}:{port}{appendPath}"), formData);
             }
-            catch(HttpRequestException error)
+            catch (HttpRequestException error)
             {
-                Console.WriteLine($"ERROR: Sending POST request to {address} failed");
-                Console.WriteLine(error.Message);
-                return new HttpResponseMessage(HttpStatusCode.InternalServerError);
+                Console.WriteLine($"ERROR: Sending POST request to {serverAddress}:{port}{appendPath} || {error.Message}");
+                returnData = new HttpResponseMessage(HttpStatusCode.InternalServerError);
             };
+
+            return returnData;
         }
 
         private string GetHeaderValue(HttpResponseHeaders headers, string headerName, string headerKey)
         {
-            if (!headers.TryGetValues(headerName, out var headerOut))
+            if (!headers.TryGetValues(headerName, out IEnumerable<string> headerOut))
+            {
+                Console.WriteLine($"ERROR: No such header exists in the response header collection: {headerName}");
                 return "";
+            }
 
-            string headerValues = String.Join(",", headerOut.ToArray());
+            string headerValues = string.Join(",", headerOut.ToArray());
             Match valueSearch = new Regex($"{headerKey}=\"(.*)\"").Match(headerValues);
 
             if (valueSearch.Success)
                 return valueSearch.Groups[1].Value;
 
+            Console.WriteLine($"ERROR: No key called {headerKey} exists in header {headerName}");
             return "";
         }
+
+        private async Task<string[]> GetContentBodyMatch(HttpContent contentBody, string regexString)
+        {
+            string stringContent = await contentBody.ReadAsStringAsync();
+            Match search = new Regex(regexString).Match(stringContent);
+
+            if (!search.Success)
+            {
+                Console.WriteLine($"No match on regex string: {regexString}");
+                return new string[0];
+            }
+            else
+            {
+                string[] returnData = new string[search.Groups.Count];
+                for (int index = 0; index < search.Groups.Count; index++)
+                    returnData[index] = search.Groups[index].Value;
+
+                return returnData;
+            }
+        }
+#endregion
     }
 }
