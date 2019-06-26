@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -23,7 +24,8 @@ namespace KF2ServerInterface
                 fileStream = new FileStream(FileName, FileMode.Append);
 
             outputFile = new StreamWriter(fileStream, Encoding.UTF8);
-            outputFile.WriteLine(output + Environment.NewLine);
+            outputFile.WriteLine(DateTime.Now.ToString("[dd/MM/yyyy - HH:mm:ss]:<br/>"));
+            outputFile.WriteLine($"<p>{output}</p>");
 
             outputFile.Dispose();
             fileStream.Dispose();
@@ -32,18 +34,17 @@ namespace KF2ServerInterface
         public static void DumpHttpHeaders(HttpResponseMessage httpResponse)
         {
             StringBuilder output = new StringBuilder();
-            output.Append("------------HTTP HEADERS------------");
+            output.Append("------------HTTP HEADERS------------<br/>");
 
             foreach (KeyValuePair<string, IEnumerable<string>> responseHeader in httpResponse.Headers)
             {
-                output.Append($"<p>{responseHeader.Key}: {string.Join(" ", responseHeader.Value)}</p>");
+                output.Append($"<div>{responseHeader.Key}: {string.Join(" ", responseHeader.Value)}</div>");
             }
             foreach (KeyValuePair<string, IEnumerable<string>> contentHeader in httpResponse.Content.Headers)
             {
-                output.Append($"<p>{contentHeader.Key}: {string.Join(" ", contentHeader.Value)}</p>");
+                output.Append($"<div>{contentHeader.Key}: {string.Join(" ", contentHeader.Value)}</div>");
             }
 
-            output.Append("------------END--------------------");
             LogToFile(output.ToString());
         }
 
@@ -56,6 +57,23 @@ namespace KF2ServerInterface
             output = Regex.Replace(output, ">", "&gt;");
 
             LogToFile((output.Length > 0 ? $"<pre>{output}</pre>" : "<empty body>"));
+        }
+
+        public static void DumpCookies(CookieCollection cookies)
+        {
+            if (cookies.Count == 0)
+            {
+                LogToFile("No cookies in collection to dump");
+                return;
+            }
+
+            StringBuilder output = new StringBuilder();
+            output.Append("------------CLIENT COOKIES------------<br/>");
+
+            foreach (Cookie cookie in cookies)
+                output.Append($"<div>{cookie.Name}: {cookie.Value}<div>");
+
+            LogToFile(output.ToString());
         }
     }
 }

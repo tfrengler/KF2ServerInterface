@@ -10,6 +10,7 @@ namespace KF2ServerInterface
         public string Gamemode { get; }
         public string ConfigDir { get; }
         public string DesiredMap { get; }
+        public bool Down { get; set; }
 
         static public string[] GameModes { get; } = new string[]
         {
