@@ -31,7 +31,7 @@ namespace KF2ServerInterface
             handler.CookieContainer = cookies;
 
             client = new HttpClient(handler);
-            //client.Timeout = new TimeSpan(0,0,10);
+            client.Timeout = new TimeSpan(0,0,10);
         }
 
 #region PUBLIC METHODS
@@ -49,9 +49,16 @@ namespace KF2ServerInterface
 
         public async Task<bool> IsServerResponding(string serverAddress, int port)
         {
-            HttpResponseMessage serverResponse = await SendGetRequest(serverAddress, port, LOGIN_PAGE);
-            if (serverResponse.IsSuccessStatusCode || serverResponse.StatusCode == HttpStatusCode.Redirect)
-                return true;
+            try
+            {
+                HttpResponseMessage serverResponse = await SendGetRequest(serverAddress, port, LOGIN_PAGE);
+                if (serverResponse.IsSuccessStatusCode || serverResponse.StatusCode == HttpStatusCode.Redirect)
+                    return true;
+            }
+            catch(TaskCanceledException error)
+            {
+                //Console.WriteLine(error.CancellationToken.IsCancellationRequested); Timeout has been reached
+            }
 
             return false;
         }
