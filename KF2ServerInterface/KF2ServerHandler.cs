@@ -12,8 +12,8 @@ namespace KF2ServerInterface
     public class KF2ServerHandler
     {
         #region PROPERTIES
-        private readonly CookieContainer cookies;
-        private readonly HttpClient client;
+        private readonly CookieContainer Cookies;
+        private readonly HttpClient Client;
 
         private const string LOGIN_PAGE = "/ServerAdmin/";
         private const string CHANGE_PAGE = "/ServerAdmin/current/change";
@@ -24,17 +24,22 @@ namespace KF2ServerInterface
         /// <summary>Returns an instance of the handler for the KF2 server instances</summary>
         public KF2ServerHandler()
         {
-            cookies = new CookieContainer();
+            Cookies = new CookieContainer();
 
-            HttpClientHandler handler = new HttpClientHandler();
-            handler.AllowAutoRedirect = false;
-            handler.CookieContainer = cookies;
+            HttpClientHandler handler = new HttpClientHandler()
+            {
+                AllowAutoRedirect = false,
+                CookieContainer = Cookies
+            };
 
-            client = new HttpClient(handler);
-            client.Timeout = new TimeSpan(0,0,10);
+            Client = new HttpClient(handler)
+            {
+                Timeout = new TimeSpan(0, 0, 30)
+            };
         }
 
-#region PUBLIC METHODS
+        #region PUBLIC METHODS
+
         public async Task<bool> SetSessionID(string serverAddress, int port)
         {
             HttpResponseMessage serverResponse = await SendGetRequest(serverAddress, port, LOGIN_PAGE);
@@ -43,7 +48,7 @@ namespace KF2ServerInterface
             if (sessionID.Length == 0)
                 return false;
 
-            cookies.Add(new Uri(serverAddress + ":" + port), new Cookie("sessionid", sessionID));
+            Cookies.Add(new Uri(serverAddress + ":" + port), new Cookie("sessionid", sessionID));
             return true;
         }
 
@@ -55,9 +60,9 @@ namespace KF2ServerInterface
                 if (serverResponse.IsSuccessStatusCode || serverResponse.StatusCode == HttpStatusCode.Redirect)
                     return true;
             }
-            catch(TaskCanceledException error)
+            catch(Exception error)
             {
-                //Console.WriteLine(error.CancellationToken.IsCancellationRequested); Timeout has been reached
+                Logger.Log("SendGetRequest throw an exception: " + error.Message, Logger.LogType.ERROR);
             }
 
             return false;
@@ -77,12 +82,20 @@ namespace KF2ServerInterface
         public async Task<string> GetLoginToken(string serverAddress, int port)
         {
             HttpResponseMessage loginPageResponse = await this.SendGetRequest(serverAddress, port, LOGIN_PAGE);
-            if (loginPageResponse.StatusCode != HttpStatusCode.OK) return "";
+            if (loginPageResponse.StatusCode != HttpStatusCode.OK)
+            {
+                Logger.Log($"Failed to get login token ({serverAddress}:{port}). Server responded with status code: {loginPageResponse.StatusCode}", Logger.LogType.ERROR);
+                return "";
+            }
 
             string[] loginToken = await GetContentBodyMatch(loginPageResponse.Content, "name=\"token\" value=\"(.*)\"");
 
             if (loginToken.Length > 0)
                 return loginToken[1];
+
+            Logger.Log($"Failed to get login token ({serverAddress}:{port})", Logger.LogType.ERROR);
+            Logger.DumpHttpHeaders(loginPageResponse);
+            Logger.DumpResponseContent(loginPageResponse.Content);
 
             return "";
         }
@@ -101,14 +114,26 @@ namespace KF2ServerInterface
             HttpResponseMessage loginResponse = await SendPostRequest(serverAddress, port, postData, LOGIN_PAGE);
 
             if (loginResponse.StatusCode != HttpStatusCode.Redirect)
+            {
+                Logger.Log($"Failed to log in ({serverAddress}:{port}). Status code: {loginResponse.StatusCode}", Logger.LogType.ERROR);
+                Logger.DumpHttpHeaders(loginResponse);
+                Logger.DumpResponseContent(loginResponse.Content);
+
                 return false;
+            }
 
             string authToken = GetHeaderValue(loginResponse.Headers, "Set-Cookie", "authcred");
 
             if (authToken.Length == 0)
-                return false;
+            {
+                Logger.Log($"Failed to log in ({serverAddress}:{port}). No authcred-cookie in response", Logger.LogType.ERROR);
+                Logger.DumpHttpHeaders(loginResponse);
+                Logger.DumpResponseContent(loginResponse.Content);
 
-            cookies.Add(new Uri(serverAddress + ":" + port), new Cookie("authcred", authToken));
+                return false;
+            }
+
+            Cookies.Add(new Uri(serverAddress + ":" + port), new Cookie("authcred", authToken));
             return true;
         }
 
@@ -120,7 +145,13 @@ namespace KF2ServerInterface
             Match playerCountSearch = new Regex("<dl id=\"currentRules\">[\\s\\S]+?<dd>(\\d)\\/6</dd>").Match(responseBody);
 
             if (!playerCountSearch.Success)
+            {
+                Logger.Log($"Failed to get player count ({address}:{port})", Logger.LogType.ERROR);
+                Logger.DumpHttpHeaders(infoPageResponse);
+                Logger.DumpResponseContent(infoPageResponse.Content);
+
                 return -1;
+            }
 
             int playerCount = Int16.Parse(playerCountSearch.Groups[1].Value);
             return playerCount;
@@ -130,13 +161,25 @@ namespace KF2ServerInterface
         {
             HttpResponseMessage httpResponse = await this.SendGetRequest(address, port, CHANGE_PAGE);
             if (httpResponse.StatusCode != HttpStatusCode.OK)
+            {
+                Logger.Log($"Failed to get current map ({address}:{port}). Status code: {httpResponse.StatusCode}", Logger.LogType.ERROR);
+                Logger.DumpHttpHeaders(httpResponse);
+                Logger.DumpResponseContent(httpResponse.Content);
+
                 return "";
+            }
 
             string responseBody = await httpResponse.Content.ReadAsStringAsync();
             Match currentMapSearch = new Regex("<select id=\"map\" name=\"map\">[\\s\\S]+?<option value=\"(.*)\" selected=\"selected\">").Match(responseBody);
 
             if (!currentMapSearch.Success)
+            {
+                Logger.Log($"Failed to get current map ({address}:{port}). Could not extract it from the response content", Logger.LogType.ERROR);
+                Logger.DumpHttpHeaders(httpResponse);
+                Logger.DumpResponseContent(httpResponse.Content);
+
                 return "";
+            }
 
             return currentMapSearch.Groups[1].Value;
         }
@@ -155,6 +198,7 @@ namespace KF2ServerInterface
             HttpResponseMessage httpResponse = await SendPostRequest(address, port, postData, CHANGE_PAGE);
             if (httpResponse.StatusCode != HttpStatusCode.OK)
             {
+                Logger.Log($"Failed to switch map ({address}:{port}). Status code: {httpResponse.StatusCode}", Logger.LogType.ERROR);
                 return false;
             }
 
@@ -164,20 +208,27 @@ namespace KF2ServerInterface
             if (changedMapSearch.Success)
                 return true;
 
+            Logger.Log($"Failed to switch ({address}:{port}). Did not get the response we expected", Logger.LogType.ERROR);
+            Logger.DumpHttpHeaders(httpResponse);
+            Logger.DumpResponseContent(httpResponse.Content);
+
             return false;
         }
-#endregion
+        #endregion
 
-#region PRIVATE METHODS
+        #region PRIVATE METHODS
+
         private async Task<HttpResponseMessage> SendGetRequest(string serverAddress, int port, string appendPath = "")
         {          
             HttpRequestMessage httpRequest = new HttpRequestMessage(HttpMethod.Get, new Uri($"{serverAddress}:{port}{appendPath}"));
             HttpResponseMessage returnData;
 
             try {
-                returnData = await client.SendAsync(httpRequest);
+                returnData = await Client.SendAsync(httpRequest);
             }
-            catch(HttpRequestException error) {
+            catch(Exception error)
+            {
+                Logger.Log($"Failed to send GET request ({serverAddress}:{port}{appendPath}): " + error.Message, Logger.LogType.DEBUG);
                 returnData = new HttpResponseMessage(HttpStatusCode.InternalServerError);
             };
 
@@ -191,10 +242,11 @@ namespace KF2ServerInterface
 
             try
             {
-                returnData = await client.PostAsync(new Uri($"{serverAddress}:{port}{appendPath}"), formData);
+                returnData = await Client.PostAsync(new Uri($"{serverAddress}:{port}{appendPath}"), formData);
             }
-            catch (HttpRequestException error)
+            catch (Exception error)
             {
+                Logger.Log($"Failed to send POST request ({serverAddress}:{port}{appendPath}): " + error.Message, Logger.LogType.DEBUG);
                 returnData = new HttpResponseMessage(HttpStatusCode.InternalServerError);
             };
 
@@ -231,6 +283,7 @@ namespace KF2ServerInterface
                 return returnData;
             }
         }
-#endregion
+
+        #endregion
     }
 }

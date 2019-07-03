@@ -11,6 +11,7 @@ namespace KF2ServerInterface
         public string ConfigDir { get; }
         public string DesiredMap { get; }
         public bool Down { get; set; }
+        public bool Disabled { get; set; }
 
         static public string[] GameModes { get; } = new string[]
         {
@@ -51,7 +52,7 @@ namespace KF2ServerInterface
             "KF-ZedLanding"
         };
 
-        public KF2ServerInstance(string name, int port, string gamemode, string configDir, string desiredMap)
+        public KF2ServerInstance(string name, int port, string gamemode, string configDir, string desiredMap, bool disabled)
         {
             if (!Maps.Contains(desiredMap))
                 throw new Exception($"The map you passed is not a valid KF2 map: {desiredMap}");
@@ -59,11 +60,12 @@ namespace KF2ServerInterface
             if (!GameModes.Contains(gamemode))
                 throw new Exception($"The gamemode you passed is not valid: {gamemode}");
 
-            this.Name = name;
-            this.Port = port;
-            this.Gamemode = "KFGameContent.KFGameInfo_" + gamemode;
-            this.ConfigDir = configDir;
-            this.DesiredMap = desiredMap;
+            Name = name;
+            Port = port;
+            Gamemode = "KFGameContent.KFGameInfo_" + gamemode;
+            ConfigDir = configDir;
+            DesiredMap = desiredMap;
+            Disabled = disabled;
         }
     }
 }

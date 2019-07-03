@@ -59,6 +59,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Config.cs" />
     <Compile Include="KF2ServerHandler.cs" />
     <Compile Include="Logger.cs" />
     <Compile Include="Program.cs" />

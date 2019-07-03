@@ -6,8 +6,8 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("KF2ServerInterface")]
-[assembly: AssemblyDescription("")]
-[assembly: AssemblyConfiguration("")]
+[assembly: AssemblyDescription("Utility for handling KF2 server instances on a local machine")]
+[assembly: AssemblyConfiguration("Retail")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("Killing Floor 2 Server Utility")]
 [assembly: AssemblyCopyright("Copyright © Thomas Frengler 2019")]

@@ -12,6 +12,18 @@ namespace KF2ServerInterface
     public static class Logger
     {
         public static string FileName { get; } = "log.html";
+        public static bool OutputToFile { get; set; } = true;
+        public static bool OutputInfoToFile { get; set; } = false;
+        public static bool OutputErrorsToFile { get; set; } = true;
+        public static bool OutputDebugToFile { get; set; } = false;
+        public static int MaxFileSize { get; } = 10 * 1024 * 1024;
+
+        public enum LogType
+        {
+            INFO,
+            ERROR,
+            DEBUG
+        };
 
         public static void LogToFile(string output)
         {
@@ -24,8 +36,9 @@ namespace KF2ServerInterface
                 fileStream = new FileStream(FileName, FileMode.Append);
 
             outputFile = new StreamWriter(fileStream, Encoding.UTF8);
-            outputFile.WriteLine(DateTime.Now.ToString("[dd/MM/yyyy - HH:mm:ss]:<br/>"));
+            outputFile.WriteLine(DateTime.Now.ToString("<p>------------------[dd/MM/yyyy - HH:mm:ss]:---------------------</p>"));
             outputFile.WriteLine($"<p>{output}</p>");
+            outputFile.WriteLine($"<p>---------------------------------------------------------------<p>");
 
             outputFile.Dispose();
             fileStream.Dispose();
@@ -34,7 +47,7 @@ namespace KF2ServerInterface
         public static void DumpHttpHeaders(HttpResponseMessage httpResponse)
         {
             StringBuilder output = new StringBuilder();
-            output.Append("------------HTTP HEADERS------------<br/>");
+            output.Append("<p>HTTP HEADERS:</p>");
 
             foreach (KeyValuePair<string, IEnumerable<string>> responseHeader in httpResponse.Headers)
             {
@@ -74,6 +87,22 @@ namespace KF2ServerInterface
                 output.Append($"<div>{cookie.Name}: {cookie.Value}<div>");
 
             LogToFile(output.ToString());
+        }
+
+        public static void Log(string output, LogType type)
+        {
+            if (type == LogType.INFO)
+                Console.WriteLine(output);
+
+            if (!OutputToFile)
+                return;
+
+            if (type == LogType.INFO && OutputInfoToFile)
+                LogToFile(output);
+            else if (type == LogType.ERROR && OutputErrorsToFile)
+                LogToFile(output);
+            else if (type == LogType.DEBUG && OutputDebugToFile)
+                LogToFile(output);
         }
     }
 }
