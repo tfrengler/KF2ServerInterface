@@ -228,7 +228,7 @@ namespace KF2ServerInterface
             }
             catch(Exception error)
             {
-                Logger.Log($"Failed to send GET request ({serverAddress}:{port}{appendPath}): " + error.Message, Logger.LogType.DEBUG);
+                Logger.Log($"Failed to send GET request ({serverAddress}:{port}{appendPath}): " + error.Message, Logger.LogType.ERROR);
                 returnData = new HttpResponseMessage(HttpStatusCode.InternalServerError);
             };
 
@@ -246,7 +246,7 @@ namespace KF2ServerInterface
             }
             catch (Exception error)
             {
-                Logger.Log($"Failed to send POST request ({serverAddress}:{port}{appendPath}): " + error.Message, Logger.LogType.DEBUG);
+                Logger.Log($"Failed to send POST request ({serverAddress}:{port}{appendPath}): " + error.Message, Logger.LogType.ERROR);
                 returnData = new HttpResponseMessage(HttpStatusCode.InternalServerError);
             };
 

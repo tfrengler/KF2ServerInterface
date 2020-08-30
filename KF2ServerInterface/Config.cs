@@ -8,7 +8,7 @@ namespace KF2ServerInterface
     {
         #region STATIC PROPERTIES
 
-        public static string FILE_NAME = "KF2ServerInterfaceConfig.xml";
+        public static string FILE_NAME = "Config.xml";
 
         #endregion
 
@@ -80,7 +80,7 @@ namespace KF2ServerInterface
             ServerUnreponsiveThreshold = 0;
             UserName = "ERROR";
             Password = "ERROR";
-            Servers = new ServerInstanceConfig[0];
+            Servers = null;
         }
 
         #endregion
@@ -96,8 +96,6 @@ namespace KF2ServerInterface
                 returnData.Result = new Config();
                 returnData.Success = false;
                 returnData.Error = $"Config file does not exist: {fileName}";
-
-                Logger.Log($"Config file does not exist: {fileName}", Logger.LogType.ERROR);
 
                 return returnData;
             }

@@ -49,13 +49,17 @@ namespace KF2ServerInterface
             "KF-TheDescent",
             "KF-TragicKingdom",
             "KF-VolterManor",
-            "KF-ZedLanding"
+            "KF-ZedLanding",
+            "KF-AshwoodAsylum",
+            "KF-Sanitarium",
+            "KF-Biolapse",
+            "KF-Desolation"
         };
 
         public KF2ServerInstance(string name, int port, string gamemode, string configDir, string desiredMap, bool disabled)
         {
-            if (!Maps.Contains(desiredMap))
-                throw new Exception($"The map you passed is not a valid KF2 map: {desiredMap}");
+            //if (!Maps.Contains(desiredMap))
+            //    throw new Exception($"The map you passed is not a valid KF2 map: {desiredMap}");
 
             if (!GameModes.Contains(gamemode))
                 throw new Exception($"The gamemode you passed is not valid: {gamemode}");

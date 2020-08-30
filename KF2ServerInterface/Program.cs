@@ -17,6 +17,8 @@ namespace KF2ServerInterface
                 Logger.Log(ConfigLoad.Error, Logger.LogType.ERROR);
                 Console.WriteLine("Press any key to exit...");
                 Console.ReadKey();
+
+                return;
             }
 
             Config Configuration = ConfigLoad.Result;
@@ -58,21 +60,21 @@ namespace KF2ServerInterface
 
             while (true)
             {
-                Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} Waking up, going to check servers" + Environment.NewLine);
+                Logger.Log("Waking up, going to check servers" + Environment.NewLine);
 
                 foreach (KF2ServerInstance currentServer in servers)
                 {
-                    Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} Name: {currentServer.Name} | Address: {Configuration.ServerAddress}:{currentServer.Port} | Gamemode: {currentServer.Gamemode} | Desired map: {currentServer.DesiredMap}");
+                    Logger.Log($"Name: {currentServer.Name} | Address: {Configuration.ServerAddress}:{currentServer.Port} | Gamemode: {currentServer.Gamemode} | Desired map: {currentServer.DesiredMap}");
 
                     if (currentServer.Disabled)
                     {
-                        Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} Server is disabled, not checking" + Environment.NewLine);
+                        Logger.Log("Server is disabled, not checking" + Environment.NewLine);
                         continue;
                     }
 
                     if (currentServer.Down)
                     {
-                        Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} WARNING - Server is down, not checking" + Environment.NewLine);
+                        Logger.Log("Server is down, not checking" + Environment.NewLine, Logger.LogType.WARNING);
                         continue;
                     }
 
@@ -82,14 +84,14 @@ namespace KF2ServerInterface
                     {
                         if (stalledServerStatus[currentServer.Name] >= Configuration.ServerUnreponsiveThreshold)
                         {
-                            Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} WARNING - Server is unresponsive after {Configuration.ServerUnreponsiveThreshold} attempts. Marking as down" + Environment.NewLine);
+                            Logger.Log($"Server is unresponsive after {Configuration.ServerUnreponsiveThreshold} attempts. Marking as down" + Environment.NewLine, Logger.LogType.WARNING);
                             currentServer.Down = true;
                             continue;
                         }
                         else
                             stalledServerStatus[currentServer.Name]++;
 
-                        Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} WARNING - Server is not responding ({stalledServerStatus[currentServer.Name]}). It is either down, or switching maps" + Environment.NewLine);
+                        Logger.Log($"Server is not responding ({stalledServerStatus[currentServer.Name]}). It is either down, or switching maps" + Environment.NewLine, Logger.LogType.WARNING);
                         continue;
                     }
 
@@ -98,60 +100,60 @@ namespace KF2ServerInterface
 
                     if (!isAuthenticated)
                     {
-                        Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} We are not authenticated");
+                        Logger.Log("We are not authenticated");
 
                         bool newSession = await serverHandler.SetSessionID(Configuration.ServerAddress, currentServer.Port);
-                        Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} New sessionid acquired: {newSession}");
+                        Logger.Log($"New sessionid acquired: {newSession}");
 
-                        Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} Looking for login token");
+                        Logger.Log("Looking for login token");
                         string loginToken = await serverHandler.GetLoginToken(Configuration.ServerAddress, currentServer.Port);
 
                         if (loginToken.Length == 0)
                         {
-                            Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} ERROR - Failed to fetch login token" + Environment.NewLine);
+                            Logger.Log("Failed to fetch login token" + Environment.NewLine, Logger.LogType.ERROR);
                             continue;
                         }
 
-                        Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} Logging in (TOKEN: {loginToken})");
+                        Logger.Log($"Logging in (TOKEN: {loginToken})");
 
                         bool loginSuccess = await serverHandler.Login(Configuration.ServerAddress, currentServer.Port, loginToken, Configuration.UserName, Configuration.Password);
-                        Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} Logged in: {loginSuccess}");
+                        Logger.Log($"Logged in: {loginSuccess}");
 
                         if (!loginSuccess)
                         {
-                            Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} ERROR - Login failed" + Environment.NewLine);
+                            Logger.Log("Login failed" + Environment.NewLine, Logger.LogType.ERROR);
                             continue;
                         }
                     }
                     else
-                        Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} We are already authenticated, no need to log in");
+                        Logger.Log("We are already authenticated, no need to log in");
 
                     int playerCount = await serverHandler.GetPlayerCount(Configuration.ServerAddress, currentServer.Port);
                     string currentMap = await serverHandler.GetCurrentMap(Configuration.ServerAddress, currentServer.Port);
 
                     if (playerCount > 0)
                     {
-                        Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} Server has active players ({playerCount}) on map {currentMap}, not switching" + Environment.NewLine);
+                        Logger.Log($"Server has active players ({playerCount}) on map {currentMap}, not switching" + Environment.NewLine);
                         continue;
                     }
 
                     if (playerCount == 0 && currentMap != currentServer.DesiredMap)
                     {
-                        Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} Server is empty and on the wrong map ({currentMap}), changing to {currentServer.DesiredMap} instead");
+                        Logger.Log($"Server is empty and on the wrong map ({currentMap}), changing to {currentServer.DesiredMap} instead");
                         bool mapSwitched = await serverHandler.SwitchMap(Configuration.ServerAddress, currentServer.Port, currentServer.Gamemode, currentServer.DesiredMap, currentServer.ConfigDir);
 
                         if (mapSwitched)
-                            Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} Map switch successful" + Environment.NewLine);
+                            Logger.Log("Map switch successful" + Environment.NewLine);
                         else
-                            Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} ERROR - Map switch not succesful" + Environment.NewLine);
+                            Logger.Log("Map switch not succesful" + Environment.NewLine, Logger.LogType.ERROR);
 
                         continue;
                     }
 
-                    Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} Server is empty but on the right map" + Environment.NewLine);
+                    Logger.Log("Server is empty but on the right map" + Environment.NewLine);
                 }
 
-                Console.WriteLine($"{DateTime.Now.ToString("[HH:mm:ss]:")} Server checking done, going back to sleep ({Configuration.ServerCheckInterval})");
+                Logger.Log($"Server checking done, going back to sleep ({Configuration.ServerCheckInterval})");
                 Thread.Sleep(Configuration.ServerCheckInterval);
             }
             
