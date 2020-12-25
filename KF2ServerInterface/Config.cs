@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Xml;
 
 namespace KF2ServerInterface
@@ -87,8 +88,9 @@ namespace KF2ServerInterface
 
         #region STATIC METHODS
 
-        public static ConfigLoadResult GetConfiguration(string fileName)
+        public static ConfigLoadResult GetConfiguration()
         {
+            string fileName = FILE_NAME;
             ConfigLoadResult returnData = new ConfigLoadResult();
 
             if (!File.Exists(fileName))

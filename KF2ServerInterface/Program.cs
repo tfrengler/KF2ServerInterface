@@ -2,16 +2,20 @@
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Threading;
+using System.Linq;
 
 namespace KF2ServerInterface
 {
     class Program
     {
-
         static async Task Main(string[] args)
         {
+            if (args.Contains("-logToFile"))
+                Logger.LogToFile = true;
+            else
+                Logger.LogToFile = false;
 
-            Config.ConfigLoadResult ConfigLoad = Config.GetConfiguration(Config.FILE_NAME);
+            Config.ConfigLoadResult ConfigLoad = Config.GetConfiguration();
             if (!ConfigLoad.Success)
             {
                 Logger.Log(ConfigLoad.Error, Logger.LogType.ERROR);
@@ -128,7 +132,7 @@ namespace KF2ServerInterface
                     else
                         Logger.Log("We are already authenticated, no need to log in");
 
-                    int playerCount = await serverHandler.GetPlayerCount(Configuration.ServerAddress, currentServer.Port);
+                    short playerCount = await serverHandler.GetPlayerCount(Configuration.ServerAddress, currentServer.Port);
                     string currentMap = await serverHandler.GetCurrentMap(Configuration.ServerAddress, currentServer.Port);
 
                     if (playerCount > 0)

@@ -137,9 +137,9 @@ namespace KF2ServerInterface
             return true;
         }
 
-        public async Task<int> GetPlayerCount(string address, int port)
+        public async Task<short> GetPlayerCount(string address, int port)
         {
-            HttpResponseMessage infoPageResponse = await this.SendGetRequest(address, port, INFO_PAGE);
+            HttpResponseMessage infoPageResponse = await SendGetRequest(address, port, INFO_PAGE);
             string responseBody = await infoPageResponse.Content.ReadAsStringAsync();
 
             Match playerCountSearch = new Regex("<dl id=\"currentRules\">[\\s\\S]+?<dd>(\\d)\\/6</dd>").Match(responseBody);
@@ -153,7 +153,7 @@ namespace KF2ServerInterface
                 return -1;
             }
 
-            int playerCount = Int16.Parse(playerCountSearch.Groups[1].Value);
+            short playerCount = short.Parse(playerCountSearch.Groups[1].Value);
             return playerCount;
         }
 

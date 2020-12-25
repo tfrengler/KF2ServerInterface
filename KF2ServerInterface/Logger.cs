@@ -15,6 +15,7 @@ namespace KF2ServerInterface
         public static ILogger Serilog;
         public static DirectoryInfo LogFolder = new DirectoryInfo(Environment.CurrentDirectory);
         public static string FileName { get; } = $"KF2ServerInterface_{DateTime.Now.Year}-{DateTime.Now.Month}-{DateTime.Now.Day}.txt";
+        public static bool LogToFile { get; set; }
 
         public enum LogType
         {
@@ -25,10 +26,14 @@ namespace KF2ServerInterface
 
         static Logger()
         {
-            if (!LogFolder.Exists)
+            if (LogToFile && !LogFolder.Exists)
                 throw new DirectoryNotFoundException("Unable to find log folder: " + LogFolder);
 
-            Serilog = new LoggerConfiguration().WriteTo.Console().WriteTo.File($"{LogFolder.FullName}/{FileName}").CreateLogger();
+            LoggerConfiguration SerilogConfig = new LoggerConfiguration().WriteTo.Console();
+            if (LogToFile)
+                SerilogConfig.WriteTo.File(path: $"{LogFolder.FullName}/{FileName}", fileSizeLimitBytes: 2*1024*1024, rollOnFileSizeLimit: true);
+
+            Serilog = SerilogConfig.CreateLogger();
         }
 
         public static void DumpHttpHeaders(HttpResponseMessage httpResponse)
