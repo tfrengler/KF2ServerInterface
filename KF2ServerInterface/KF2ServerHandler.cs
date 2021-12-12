@@ -184,14 +184,43 @@ namespace KF2ServerInterface
             return currentMapSearch.Groups[1].Value;
         }
 
-        public async Task<bool> SwitchMap(string address, int port, string gamemode, string newMap, string configDir)
+        public async Task<Tuple<string, string>> GetGameModeAndExtraConfig(string address, int port)
+        {
+            HttpResponseMessage httpResponse = await this.SendGetRequest(address, port, CHANGE_PAGE);
+            if (httpResponse.StatusCode != HttpStatusCode.OK)
+            {
+                Logger.Log($"Failed to get current map ({address}:{port}). Status code: {httpResponse.StatusCode}", Logger.LogType.ERROR);
+                Logger.DumpHttpHeaders(httpResponse);
+                Logger.DumpResponseContent(httpResponse.Content);
+
+                return null;
+            }
+
+            string responseBody = await httpResponse.Content.ReadAsStringAsync();
+
+            Match GameType = new Regex("<option value=\"KFGameContent.KFGameInfo_(.*)\" selected").Match(responseBody);
+            Match URLExtra = new Regex("urlextra.*value=\"(.*)\"").Match(responseBody);
+
+            if (!GameType.Success || !URLExtra.Success)
+            {
+                Logger.Log($"Failed to get gamemode and URL extra ({address}:{port}). Could not extract it from the response content", Logger.LogType.ERROR);
+                Logger.DumpHttpHeaders(httpResponse);
+                Logger.DumpResponseContent(httpResponse.Content);
+
+                return null;
+            }
+
+            return new Tuple<string, string>(GameType.Groups[1].Value, URLExtra.Groups[1].Value);
+        }
+
+        public async Task<bool> SwitchMap(string address, int port, string gamemode, string newMap, string urlExtra)
         {
             Dictionary<string, string> postData = new Dictionary<string, string>
             {
                 { "gametype", gamemode },
                 { "map", newMap },
                 { "mutatorGroupCount", "0" },
-                { "urlextra", $"?ConfigSubDir={configDir}" },
+                { "urlextra", urlExtra },
                 { "action", "change" }
             };
 
@@ -219,7 +248,7 @@ namespace KF2ServerInterface
         #region PRIVATE METHODS
 
         private async Task<HttpResponseMessage> SendGetRequest(string serverAddress, int port, string appendPath = "")
-        {          
+        {
             HttpRequestMessage httpRequest = new HttpRequestMessage(HttpMethod.Get, new Uri($"{serverAddress}:{port}{appendPath}"));
             HttpResponseMessage returnData;
 

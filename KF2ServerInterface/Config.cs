@@ -5,7 +5,7 @@ using System.Xml;
 
 namespace KF2ServerInterface
 {
-    public class Config
+    public sealed class Config
     {
         #region STATIC PROPERTIES
 
@@ -38,12 +38,10 @@ namespace KF2ServerInterface
             public ServerInstanceConfig[] Servers { get; set; }
         }
 
-        public class ServerInstanceConfig
+        public sealed class ServerInstanceConfig
         {
             public string Name { get; set; }
             public int Port { get; set; }
-            public string Gamemode { get; set; }
-            public string ConfigDir { get; set; }
             public string DesiredMap { get; set; }
             public bool Disabled { get; set; }
         }
@@ -157,7 +155,7 @@ namespace KF2ServerInterface
 
             // Defaulting to the global desired map if a map is not defined by the instance-settings itself
             foreach (ServerInstanceConfig CurrentServer in ServerConfigs)
-                if (CurrentServer.DesiredMap == null || (CurrentServer.DesiredMap is string && CurrentServer.DesiredMap.Length == 0))
+                if ( string.IsNullOrEmpty(CurrentServer.DesiredMap) )
                     CurrentServer.DesiredMap = GlobalSettings.DesiredMap;
 
             returnData.Success = true;
@@ -233,12 +231,6 @@ namespace KF2ServerInterface
                             break;
                         case "Port":
                             ServerConfigs[Index].Port = int.Parse(InstanceSetting.InnerText);
-                            break;
-                        case "Gamemode":
-                            ServerConfigs[Index].Gamemode = InstanceSetting.InnerText;
-                            break;
-                        case "ConfigDir":
-                            ServerConfigs[Index].ConfigDir = InstanceSetting.InnerText;
                             break;
                         case "DesiredMap":
                             ServerConfigs[Index].DesiredMap = InstanceSetting.InnerText;

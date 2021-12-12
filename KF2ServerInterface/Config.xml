@@ -3,12 +3,12 @@
 
 	<Global>
 
-		<DesiredMap>KF-SteamFortress</DesiredMap>
-		<ServerAddress>http://127.0.0.1</ServerAddress>
+		<DesiredMap>KF-XXX</DesiredMap>
+		<ServerAddress>http://XXX.XXX.XXX.XXX</ServerAddress>
 		<ServerCheckInterval>600</ServerCheckInterval>
 		<ServerUnreponsiveThreshold>3</ServerUnreponsiveThreshold>
-		<UserName>xxx</UserName>
-		<Password>xxx</Password>
+		<UserName>XXX</UserName>
+		<Password>XXX</Password>
 
 	</Global>
 
@@ -17,49 +17,38 @@
 		<KF2ServerInstance>
 			<Name>PRIVATE</Name>
 			<Port>8000</Port>
-			<Gamemode>Endless</Gamemode>
-			<ConfigDir>Private</ConfigDir>
-			<!-- <DesiredMap></DesiredMap> -->
+			<DesiredMap></DesiredMap>
+			<Disabled>false</Disabled>
 		</KF2ServerInstance>
 
 		<KF2ServerInstance>
 			<Name>HARD</Name>
 			<Port>8001</Port>
-			<Gamemode>Survival</Gamemode>
-			<ConfigDir>Hard</ConfigDir>
-			<!-- <DesiredMap></DesiredMap> -->
+			<DesiredMap></DesiredMap>
 		</KF2ServerInstance>
 
 		<KF2ServerInstance>
 			<Name>SUICIDAL</Name>
 			<Port>8002</Port>
-			<Gamemode>Survival</Gamemode>
-			<ConfigDir>Suicidal</ConfigDir>
-			<!-- <DesiredMap></DesiredMap> -->
+			<DesiredMap></DesiredMap>
 		</KF2ServerInstance>
 
 		<KF2ServerInstance>
-			<Name>HELL ON EARTH</Name>
+			<Name>ENDLESS</Name>
 			<Port>8003</Port>
-			<Gamemode>Survival</Gamemode>
-			<ConfigDir>HoE</ConfigDir>
-			<!-- <DesiredMap></DesiredMap> -->
+			<DesiredMap></DesiredMap>
 		</KF2ServerInstance>
 
 		<KF2ServerInstance>
 			<Name>WEEKLY</Name>
 			<Port>8004</Port>
-			<Gamemode>WeeklySurvival</Gamemode>
-			<ConfigDir>Weekly</ConfigDir>
-			<!-- <DesiredMap></DesiredMap> -->
+			<DesiredMap></DesiredMap>
 		</KF2ServerInstance>
 
 		<KF2ServerInstance>
 			<Name>OBJECTIVE</Name>
 			<Port>8005</Port>
-			<Gamemode>Objective</Gamemode>
-			<ConfigDir>ObjectiveHard</ConfigDir>
-			<!-- <DesiredMap></DesiredMap> -->
+			<DesiredMap></DesiredMap>
 		</KF2ServerInstance>
 
 	</KF2Servers>

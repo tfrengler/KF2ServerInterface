@@ -47,8 +47,6 @@ namespace KF2ServerInterface
                     new KF2ServerInstance(
                         currentServerConfig.Name,
                         currentServerConfig.Port,
-                        currentServerConfig.Gamemode,
-                        currentServerConfig.ConfigDir,
                         currentServerConfig.DesiredMap,
                         currentServerConfig.Disabled
                     ),
@@ -64,11 +62,12 @@ namespace KF2ServerInterface
 
             while (true)
             {
+                Console.Clear();
                 Logger.Log("Waking up, going to check servers" + Environment.NewLine);
 
                 foreach (KF2ServerInstance currentServer in servers)
                 {
-                    Logger.Log($"Name: {currentServer.Name} | Address: {Configuration.ServerAddress}:{currentServer.Port} | Gamemode: {currentServer.Gamemode} | Desired map: {currentServer.DesiredMap}");
+                    Logger.Log($"Name: {currentServer.Name} | Address: {Configuration.ServerAddress}:{currentServer.Port} | Desired map: {currentServer.DesiredMap}");
 
                     if (currentServer.Disabled)
                     {
@@ -137,14 +136,18 @@ namespace KF2ServerInterface
 
                     if (playerCount > 0)
                     {
-                        Logger.Log($"Server has active players ({playerCount}) on map {currentMap}, not switching" + Environment.NewLine);
+                        Logger.Log($"Server has active players ({playerCount}) on map {currentMap}, leaving it alone" + Environment.NewLine);
                         continue;
                     }
 
                     if (playerCount == 0 && currentMap != currentServer.DesiredMap)
                     {
-                        Logger.Log($"Server is empty and on the wrong map ({currentMap}), changing to {currentServer.DesiredMap} instead");
-                        bool mapSwitched = await serverHandler.SwitchMap(Configuration.ServerAddress, currentServer.Port, currentServer.Gamemode, currentServer.DesiredMap, currentServer.ConfigDir);
+                        var GetGameModeAndExtraConfig = await serverHandler.GetGameModeAndExtraConfig(Configuration.ServerAddress, currentServer.Port);
+                        if (GetGameModeAndExtraConfig == null)
+                            continue;
+
+                        Logger.Log($"Server is empty and on the wrong map ({currentMap}), changing to {currentServer.DesiredMap} instead (MODE: {GetGameModeAndExtraConfig.Item1} | URL EXTRA: {GetGameModeAndExtraConfig.Item2})");
+                        bool mapSwitched = await serverHandler.SwitchMap(Configuration.ServerAddress, currentServer.Port, $"KFGameContent.KFGameInfo_{GetGameModeAndExtraConfig.Item1}", currentServer.DesiredMap, GetGameModeAndExtraConfig.Item2);
 
                         if (mapSwitched)
                             Logger.Log("Map switch successful" + Environment.NewLine);
@@ -158,9 +161,9 @@ namespace KF2ServerInterface
                 }
 
                 Logger.Log($"Server checking done, going back to sleep ({Configuration.ServerCheckInterval})");
-                Thread.Sleep(Configuration.ServerCheckInterval);
+                await Task.Delay(Configuration.ServerCheckInterval);
             }
-            
+
         }
     }
 }
