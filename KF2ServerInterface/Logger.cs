@@ -38,6 +38,12 @@ namespace KF2ServerInterface
 
         public static void DumpHttpHeaders(HttpResponseMessage httpResponse)
         {
+            if (httpResponse == null)
+            {
+                Log("DumpHttpHeaders: httpResponse is null", LogType.WARNING);
+                return;
+            }
+
             StringBuilder output = new StringBuilder();
             output.Append("DUMP - HTTP HEADERS:" + Environment.NewLine);
 
@@ -55,6 +61,12 @@ namespace KF2ServerInterface
 
         public static void DumpResponseContent(HttpContent content)
         {
+            if (content == null)
+            {
+                Log("DumpResponseContent: content is null", LogType.WARNING);
+                return;
+            }
+
             Task<string> responseBody = content.ReadAsStringAsync();
             while (!responseBody.IsCompleted) ;
 
@@ -66,9 +78,9 @@ namespace KF2ServerInterface
 
         public static void DumpCookies(CookieCollection cookies)
         {
-            if (cookies.Count == 0)
+            if (cookies == null || (cookies != null && cookies.Count == 0))
             {
-                Log("No cookies in collection to dump", LogType.ERROR);
+                Log("No cookies in collection to dump, or cookies is null", LogType.ERROR);
                 return;
             }
 

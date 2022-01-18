@@ -298,6 +298,9 @@ namespace KF2ServerInterface
 
         private async Task<string[]> GetContentBodyMatch(HttpContent contentBody, string regexString)
         {
+            if (contentBody == null)
+                return new string[0];
+
             string stringContent = await contentBody.ReadAsStringAsync();
             Match search = new Regex(regexString).Match(stringContent);
 
