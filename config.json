@@ -1,0 +1,14 @@
+{
+    "DesiredMap": "DesiredMap",
+    "ServerAddress": "ServerAddress",
+    "Username": "Username",
+    "Password": "Password",
+    "Servers": [
+        {
+            "Name": "Name",
+            "Port": 8080,
+            "DesiredMap": "DesiredMap",
+            "Disabled": true
+        }
+    ]
+}
