@@ -133,7 +133,7 @@ func main() {
 
 			if playerCount == 0 && (Configuration.KillOnEmpty || (Configuration.KillAfter != -1 && time.Now().Local().Hour() > Configuration.KillAfter)) {
 
-				fmt.Println("Server has no players and shutdown conditions are met, killing server")
+				printLine("Server has no players and shutdown conditions are met, killing server")
 				Error = shutdown(*ServerURL)
 				if Error != nil {
 					onCheckingServerError(Error)
@@ -141,7 +141,7 @@ func main() {
 				}
 				currentServer.Inactive = true
 				InactiveServers++
-				fmt.Println("Server shutdown successful, marked as inactive")
+				printLine("Server shutdown successful, marked as inactive")
 				continue
 			}
 
