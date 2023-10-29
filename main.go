@@ -31,7 +31,7 @@ type Config struct {
 	Password      string
 	GameMode      GameMode
 	CheckInterval time.Duration
-	Servers       *[]Server
+	Servers       *[]*Server
 }
 
 type Server struct {
@@ -113,34 +113,20 @@ func main() {
 
 			fmt.Println("Server has no players, checking map")
 
-			var DesiredMap string
-			if currentServer.DesiredMap == "" {
-				DesiredMap = fmt.Sprintf("KF-%s", Configuration.DesiredMap)
-			} else {
-				DesiredMap = fmt.Sprintf("KF-%s", currentServer.DesiredMap)
-			}
-
 			currentMap, Error := getCurrentMap(*ServerURL)
 			if Error != nil {
 				onCheckingServerError(Error)
 				continue
 			}
 
-			if currentMap == DesiredMap {
+			if currentMap == currentServer.DesiredMap {
 				fmt.Printf("Server on desired map (%s)\n", currentMap)
 				continue
 			}
 
-			var GameMode GameMode
-			if currentServer.GameMode == GameMode_NONE {
-				GameMode = Configuration.GameMode
-			} else {
-				GameMode = currentServer.GameMode
-			}
+			fmt.Printf("Changing map from '%s' to '%s' (%s)\n", currentMap, currentServer.DesiredMap, currentServer.GameMode)
 
-			fmt.Printf("Changing map from '%s' to '%s' (%s)\n", currentMap, DesiredMap, GameMode)
-
-			Error = changeMap(*ServerURL, GameMode, currentServer.ConfigSubFolder, DesiredMap)
+			Error = changeMap(*ServerURL, currentServer.GameMode, currentServer.ConfigSubFolder, currentServer.DesiredMap)
 			if Error != nil {
 				onCheckingServerError(Error)
 				continue
@@ -180,10 +166,44 @@ func loadConfig() error {
 		Configuration.CheckInterval = 10 * time.Second
 	}
 
+	Configuration.GameMode = validateAndGetGameMode(string(Configuration.GameMode))
+
+	for _, currentServer := range *Configuration.Servers {
+
+		if currentServer.GameMode == GameMode_NONE {
+			currentServer.GameMode = Configuration.GameMode
+		} else {
+			currentServer.GameMode = validateAndGetGameMode(string(currentServer.GameMode))
+		}
+
+		if currentServer.DesiredMap == "" {
+			currentServer.DesiredMap = fmt.Sprintf("KF-%s", Configuration.DesiredMap)
+		} else {
+			currentServer.DesiredMap = fmt.Sprintf("KF-%s", currentServer.DesiredMap)
+		}
+	}
+
 	var ConfigStringified, _ = json.MarshalIndent(Configuration, "", "    ")
 	fmt.Printf("Configuration loaded:%s\n\n", string(ConfigStringified))
 
 	return nil
+}
+
+func validateAndGetGameMode(gamemode string) GameMode {
+	switch gamemode {
+	case "S":
+		return GameMode_Survival
+	case "E":
+		return GameMode_Endless
+	case "O":
+		return GameMode_Objective
+	case "W":
+		return GameMode_WeeklySurvival
+	case "WS":
+		return GameMode_WeeklySurvival
+	default:
+		panic(fmt.Sprintf("error validating gamemode, as '%s' is not a valid option", gamemode))
+	}
 }
 
 func isLoggedIn(address url.URL) (bool, error) {

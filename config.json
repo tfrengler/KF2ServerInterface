@@ -1,9 +1,9 @@
 {
     "DesiredMap": "Rig",
-    "ServerAddress": "http://192.168.178.33",
+    "ServerAddress": "http://localhost",
     "Username": "admin",
     "Password": "test",
-    "GameMode": "KFGameContent.KFGameInfo_Survival",
+    "GameMode": "S",
     "CheckInterval": 600,
     "Servers": [
         {
