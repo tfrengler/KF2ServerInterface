@@ -72,10 +72,12 @@ func main() {
 
 	for {
 		printLine("Waking up")
+		printLine(fmt.Sprintf("%d servers out of %d are inactive", InactiveServers, len(*Configuration.Servers)))
+
 		for _, currentServer := range *Configuration.Servers {
 
 			if InactiveServers >= len(*Configuration.Servers) {
-				fmt.Println("All servers are inactive, exiting program")
+				printLine("All servers are inactive, exiting program")
 				os.Exit(0)
 			}
 
@@ -87,8 +89,8 @@ func main() {
 				continue
 			}
 
-			if currentServer.UnreachableCount == 5 {
-				printLine("WARN: Server is considered unreachable after 5 failed connection attempts, marking as inactive")
+			if currentServer.UnreachableCount == 3 {
+				printLine("WARN: Server is considered unreachable after 3 failed connection attempts, marking as inactive")
 				currentServer.Inactive = true
 				InactiveServers++
 				continue
