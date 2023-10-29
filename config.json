@@ -1,14 +1,18 @@
 {
-    "DesiredMap": "DesiredMap",
-    "ServerAddress": "ServerAddress",
-    "Username": "Username",
-    "Password": "Password",
+    "DesiredMap": "Rig",
+    "ServerAddress": "http://192.168.178.33",
+    "Username": "admin",
+    "Password": "test",
+    "GameMode": "KFGameContent.KFGameInfo_Survival",
+    "CheckInterval": 600,
     "Servers": [
         {
-            "Name": "Name",
+            "Name": "Testy",
             "Port": 8080,
-            "DesiredMap": "DesiredMap",
-            "Disabled": true
+            "DesiredMap": "",
+            "Disabled": false,
+            "GameMode": "",
+            "ConfigSubFolder": "TestConfigFolder"
         }
     ]
 }
