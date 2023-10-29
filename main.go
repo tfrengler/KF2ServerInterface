@@ -31,16 +31,19 @@ type Config struct {
 	Password      string
 	GameMode      GameMode
 	CheckInterval time.Duration
+	KillOnEmpty   bool
+	KillAfter     int
 	Servers       *[]*Server
 }
 
 type Server struct {
-	Name            string
-	Port            int
-	DesiredMap      string
-	GameMode        GameMode
-	Disabled        bool
-	ConfigSubFolder string
+	Name             string
+	Port             int
+	DesiredMap       string
+	GameMode         GameMode
+	Inactive         bool
+	ConfigSubFolder  string
+	UnreachableCount int
 }
 
 var Configuration Config
@@ -51,13 +54,12 @@ var LoginPage = "/ServerAdmin/"
 var ServerStatusPage = "/ServerAdmin/current/info"
 var GamesummaryPage = "/ServerAdmin/current+gamesummary"
 var ChangeMapPage = "/ServerAdmin/current/change"
+var ConsolePage = "/ServerAdmin/console"
+var InactiveServers = 0
 
 func main() {
 
-	var configError = loadConfig()
-	if configError != nil {
-		panic(configError)
-	}
+	loadConfig()
 
 	var cookieJar, _ = cookiejar.New(nil)
 	Client = &http.Client{
@@ -69,13 +71,26 @@ func main() {
 	}
 
 	for {
-		fmt.Println("Waking up!")
+		printLine("Waking up")
 		for _, currentServer := range *Configuration.Servers {
 
-			fmt.Printf("Checking server '%s'\n", currentServer.Name)
+			if InactiveServers >= len(*Configuration.Servers) {
+				fmt.Println("All servers are inactive, exiting program")
+				os.Exit(0)
+			}
 
-			if currentServer.Disabled {
-				fmt.Println("Server is disabled, skipping")
+			fmt.Println("----------------------------------------------")
+			printLine(fmt.Sprintf("Checking server '%s'", currentServer.Name))
+
+			if currentServer.Inactive {
+				printLine("Server is inactive, skipping")
+				continue
+			}
+
+			if currentServer.UnreachableCount == 5 {
+				printLine("WARN: Server is considered unreachable after 5 failed connection attempts, marking as inactive")
+				currentServer.Inactive = true
+				InactiveServers++
 				continue
 			}
 
@@ -87,17 +102,20 @@ func main() {
 			var isLoggedIn, Error = isLoggedIn(*ServerURL)
 			if Error != nil {
 				onCheckingServerError(Error)
+				currentServer.UnreachableCount++
 				continue
 			}
 
+			currentServer.UnreachableCount = 0
+
 			if !isLoggedIn {
-				fmt.Println("We have no authenticated session, need to log in")
+				printLine("We have no authenticated session, need to log in")
 				Error = login(*ServerURL, Configuration.Username, Configuration.Password)
 				if Error != nil {
 					onCheckingServerError(Error)
 					continue
 				}
-				fmt.Println("Login successful")
+				printLine("Login successful")
 			}
 
 			playerCount, Error := getPlayerCount(*ServerURL)
@@ -107,11 +125,25 @@ func main() {
 			}
 
 			if playerCount > 0 {
-				fmt.Printf("Server has players (%d), not checking map\n", playerCount)
+				printLine(fmt.Sprintf("Server has players (%d), skipping other checks", playerCount))
 				continue
 			}
 
-			fmt.Println("Server has no players, checking map")
+			if playerCount == 0 && (Configuration.KillOnEmpty || (Configuration.KillAfter != -1 && time.Now().Local().Hour() > Configuration.KillAfter)) {
+
+				fmt.Println("Server has no players and shutdown conditions are met, killing server")
+				Error = shutdown(*ServerURL)
+				if Error != nil {
+					onCheckingServerError(Error)
+					continue
+				}
+				currentServer.Inactive = true
+				InactiveServers++
+				fmt.Println("Server shutdown successful, marked as inactive")
+				continue
+			}
+
+			printLine("Server has no players, checking map")
 
 			currentMap, Error := getCurrentMap(*ServerURL)
 			if Error != nil {
@@ -120,11 +152,11 @@ func main() {
 			}
 
 			if currentMap == currentServer.DesiredMap {
-				fmt.Printf("Server on desired map (%s)\n", currentMap)
+				printLine(fmt.Sprintf("Server on desired map (%s)", currentMap))
 				continue
 			}
 
-			fmt.Printf("Changing map from '%s' to '%s' (%s)\n", currentMap, currentServer.DesiredMap, currentServer.GameMode)
+			printLine(fmt.Sprintf("Changing map from '%s' to '%s' (gamemode: %s)", currentMap, currentServer.DesiredMap, currentServer.GameMode))
 
 			Error = changeMap(*ServerURL, currentServer.GameMode, currentServer.ConfigSubFolder, currentServer.DesiredMap)
 			if Error != nil {
@@ -132,43 +164,82 @@ func main() {
 				continue
 			}
 
-			fmt.Println("Map change successful")
+			printLine("Map change successful")
 		}
-		fmt.Printf("Done checking servers, sleeping (%d seconds)\n", Configuration.CheckInterval)
-		time.Sleep(Configuration.CheckInterval * time.Second)
+
+		printLine(fmt.Sprintf("Done checking servers, sleeping (%f seconds)\n", time.Duration.Seconds(Configuration.CheckInterval)))
+		time.Sleep(Configuration.CheckInterval)
 	}
 }
 
 func onCheckingServerError(error error) {
-	fmt.Printf("Error while checking server:\n\t%s\n", error.Error())
+	printLine(fmt.Sprintf("Error while checking server:\n\t%s", error.Error()))
 }
 
-func loadConfig() error {
+func loadConfig() {
 	var data, readError = os.ReadFile("config.json")
 
 	if readError != nil {
-		return fmt.Errorf("failed to read config: %s", readError)
+		panic(fmt.Sprintf("failed to read config: %s", readError))
 	}
 
 	var jsonError = json.Unmarshal(data, &Configuration)
 
 	if jsonError != nil {
-		return fmt.Errorf("failed to parse config: %s", jsonError)
+		panic(fmt.Sprintf("failed to parse config: %s", jsonError))
+	}
+
+	if len(Configuration.DesiredMap) == 0 {
+		panic("error validating config: item 'DesiredMap' is empty")
+	}
+
+	if len(Configuration.Username) == 0 {
+		panic("error validating config: item 'Username' is empty")
+	}
+
+	if len(Configuration.Password) == 0 {
+		panic("error validating config: item 'Password' is empty")
+	}
+
+	if Configuration.GameMode == GameMode_NONE {
+		panic("error validating config: item 'GameMode' is empty")
 	}
 
 	var entryPoint, urlParseError = url.Parse(Configuration.ServerAddress)
 	if urlParseError != nil {
-		return fmt.Errorf("failed to parse config ServerAddress: %s", urlParseError)
+		panic(fmt.Sprintf("failed to parse config item 'ServerAddress': %s", urlParseError))
 	}
 	EntryPoint = entryPoint
 
-	if Configuration.CheckInterval < 0 {
-		Configuration.CheckInterval = 10 * time.Second
+	if Configuration.CheckInterval < 60 {
+		fmt.Printf("WARN: Configuration item 'CheckInterval' is invalid (%d). Minimum is 60 seconds. Defaulting instead to 10 minutes\n", Configuration.CheckInterval)
+		Configuration.CheckInterval = 10 * time.Minute
+	} else {
+		Configuration.CheckInterval = Configuration.CheckInterval * time.Second
+	}
+
+	if Configuration.KillAfter > 23 || Configuration.KillAfter < -1 {
+		fmt.Printf("WARN: Configuration item 'KillAfter' is invalid (%d), setting to -1 (disabled)\n", Configuration.KillAfter)
+		Configuration.KillAfter = -1
+	}
+
+	if Configuration.KillAfter > -1 && Configuration.KillOnEmpty {
+		fmt.Println("WARN: Configuration item 'KillAfter' and 'KillOnEmpty' are both defined. 'KillAfter' will be disabled")
+		Configuration.KillAfter = -1
 	}
 
 	Configuration.GameMode = validateAndGetGameMode(string(Configuration.GameMode))
 
 	for _, currentServer := range *Configuration.Servers {
+
+		if len(currentServer.Name) == 0 {
+			panic("error validating config: item 'Name' is empty")
+		}
+
+		if currentServer.Inactive {
+			InactiveServers++
+			continue
+		}
 
 		if currentServer.GameMode == GameMode_NONE {
 			currentServer.GameMode = Configuration.GameMode
@@ -185,8 +256,6 @@ func loadConfig() error {
 
 	var ConfigStringified, _ = json.MarshalIndent(Configuration, "", "    ")
 	fmt.Printf("Configuration loaded:%s\n\n", string(ConfigStringified))
-
-	return nil
 }
 
 func validateAndGetGameMode(gamemode string) GameMode {
@@ -211,18 +280,18 @@ func isLoggedIn(address url.URL) (bool, error) {
 	var response, responseError = Client.Get(serverStatusPage)
 
 	if responseError != nil {
-		return false, fmt.Errorf("error when determining whether we are logged in (%s): %s", address.String(), responseError.Error())
+		return false, fmt.Errorf("error when determining whether we are logged in: %s", responseError.Error())
 	}
 
 	if response.StatusCode != http.StatusOK {
-		return false, fmt.Errorf("error when determining whether we are logged in (%s): %s", serverStatusPage, response.Status)
+		return false, fmt.Errorf("error when determining whether we are logged in: %s", response.Status)
 	}
 
 	var responseContent, readError = io.ReadAll(response.Body)
 	defer response.Body.Close()
 
 	if readError != nil {
-		return false, fmt.Errorf("error when trying to parse server status-page response body (%s): %s", serverStatusPage, responseError)
+		return false, fmt.Errorf("error when trying to parse server status-page response body: %s", responseError)
 	}
 
 	loginFormRegex, _ := regexp.Compile("<form id=\"loginform\"")
@@ -236,18 +305,18 @@ func login(address url.URL, username string, password string) error {
 	var response, responseError = Client.Get(loginPage)
 
 	if responseError != nil {
-		return fmt.Errorf("error when trying to retrieve login-page (%s): %s", loginPage, responseError)
+		return fmt.Errorf("error when trying to retrieve login-page: %s", responseError)
 	}
 
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("error when trying to retrieve login-page (%s): %s", loginPage, response.Status)
+		return fmt.Errorf("error when trying to retrieve login-page: %s", response.Status)
 	}
 
 	var responseContent, readError = io.ReadAll(response.Body)
 	defer response.Body.Close()
 
 	if readError != nil {
-		return fmt.Errorf("error when trying to parse login-page response body (%s): %s", loginPage, responseError)
+		return fmt.Errorf("error when trying to parse login-page response body: %s", responseError)
 	}
 
 	tokenRegex, _ := regexp.Compile("name=\"token\"\\svalue=\"(.+)\"")
@@ -268,11 +337,11 @@ func login(address url.URL, username string, password string) error {
 	response, responseError = Client.PostForm(loginPage, requestBody)
 
 	if responseError != nil {
-		return fmt.Errorf("error when trying to log in (%s): %s", loginPage, responseError)
+		return fmt.Errorf("error when trying to log in: %s", responseError)
 	}
 
 	if !(response.StatusCode == http.StatusOK || response.StatusCode == http.StatusFound) {
-		return fmt.Errorf("error when trying to log in (%s): %s", loginPage, response.Status)
+		return fmt.Errorf("error when trying to log in: %s", response.Status)
 	}
 
 	var responseCookies = response.Cookies()
@@ -285,7 +354,7 @@ func login(address url.URL, username string, password string) error {
 	}
 
 	if authCookie == nil {
-		return fmt.Errorf("error when trying to log in as there's no auth-cookie in POST response (%s) (status: %s)", loginPage, response.Status)
+		return fmt.Errorf("error when trying to log in as there's no auth-cookie in POST response (status: %s)", response.Status)
 	}
 
 	return nil
@@ -296,18 +365,18 @@ func getPlayerCount(address url.URL) (int, error) {
 	var response, responseError = Client.PostForm(gamesummaryPage, url.Values{"ajax": {"1"}})
 
 	if responseError != nil {
-		return 0, fmt.Errorf("error calling gamesummary (%s): %s", gamesummaryPage, responseError)
+		return 0, fmt.Errorf("error calling gamesummary: %s", responseError)
 	}
 
 	if response.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("error calling gamesummary  (%s): %s", gamesummaryPage, response.Status)
+		return 0, fmt.Errorf("error calling gamesummary: %s", response.Status)
 	}
 
 	var responseContent, readError = io.ReadAll(response.Body)
 	defer response.Body.Close()
 
 	if readError != nil {
-		return 0, fmt.Errorf("error reading gamesummary response body (%s): %s", gamesummaryPage, responseError)
+		return 0, fmt.Errorf("error reading gamesummary response body: %s", responseError)
 	}
 
 	playerCountRegex, _ := regexp.Compile(`gs_players.+(\d{1})\/`)
@@ -327,25 +396,25 @@ func getCurrentMap(address url.URL) (string, error) {
 	var response, responseError = Client.Get(changePage)
 
 	if responseError != nil {
-		return "", fmt.Errorf("error calling change-page (%s): %s", changePage, responseError)
+		return "", fmt.Errorf("error calling change-page: %s", responseError)
 	}
 
 	if response.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("error when trying to change map (%s): %s", changePage, response.Status)
+		return "", fmt.Errorf("error calling change-page: %s", response.Status)
 	}
 
 	var responseContent, readError = io.ReadAll(response.Body)
 	defer response.Body.Close()
 
 	if readError != nil {
-		return "", fmt.Errorf("error reading change-page response body (%s): %s", changePage, responseError)
+		return "", fmt.Errorf("error reading change-page response body: %s", responseError)
 	}
 
 	currentMapRegex, _ := regexp.Compile(`<select id="map" name="map">[\s\S]+?<option value="(.*)" selected="selected">`)
 	var currentMapString = currentMapRegex.FindStringSubmatch(string(responseContent))[1]
 
 	if currentMapString == "" {
-		return "", fmt.Errorf("error parsing change-page because mapname is empty (%s)", changePage)
+		panic("error parsing change-page because mapname regex turned up empty")
 	}
 
 	return currentMapString, nil
@@ -372,4 +441,27 @@ func changeMap(address url.URL, gameMode GameMode, configSubDir string, desiredM
 	}
 
 	return nil
+}
+
+func shutdown(address url.URL) error {
+	var consolePage = address.String() + ConsolePage
+
+	var requestBody = url.Values{}
+	requestBody.Set("command", "exit")
+
+	var response, responseError = Client.PostForm(consolePage, requestBody)
+
+	if responseError != nil {
+		return fmt.Errorf("error when trying to shut down server: %s", responseError)
+	}
+
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("error when trying to shut down server: %s", response.Status)
+	}
+
+	return nil
+}
+
+func printLine(message string) {
+	fmt.Printf("[%s] - %s\n", time.Now().Format(time.TimeOnly), message)
 }

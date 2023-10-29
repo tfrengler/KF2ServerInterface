@@ -5,12 +5,14 @@
     "Password": "test",
     "GameMode": "S",
     "CheckInterval": 600,
+    "KillOnEmpty": true,
+    "KillAfter": -1,
     "Servers": [
         {
             "Name": "Testy",
             "Port": 8080,
             "DesiredMap": "",
-            "Disabled": false,
+            "Inactive": false,
             "GameMode": "",
             "ConfigSubFolder": "TestConfigFolder"
         }

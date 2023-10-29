@@ -78,12 +78,23 @@ Region=3";
 /* Inheriting from Config/DefaultWeb.ini does not seem to work. This is a full copy of DefaultWeb anno Aug 2020 */
 public string GetWebIni(uint WebAdminPort)
 {
-    return $@"[Configuration]
-BasedOn=..\%GAME%Game\Config\KFWeb.ini
+    return $@"[IpDrv.WebConnection]
+MaxValueLength=4096
+MaxLineLength=4096
 
 [IpDrv.WebServer]
+Applications[0]=WebAdmin.KF2ServerAdmin
+Applications[1]=WebAdmin.KF2ImageServer
+ApplicationPaths[0]=/ServerAdmin
+ApplicationPaths[1]=/images
 ListenPort={WebAdminPort}
-bEnabled=True";
+MaxConnections=18
+ExpirationSeconds=86400
+bEnabled=True
+
+[IpDrv.WebResponse]
+IncludePath=/KFGame/Web
+";
 }
 
 public string GetStartScript(GameMode gameMode, uint QueryPort, uint GamePort, string ConfigDirName)
@@ -182,7 +193,7 @@ var Servers = new ServerInfo[]
     },
     //ENDLESS (old HoE server):
     new ServerInfo {
-        Mode=GameMode.ENDLESS, // Endless has no standard difficulty, as the game ramps up during waves 
+        Mode=GameMode.ENDLESS, // Endless has no standard difficulty, as the game ramps up during waves
         Difficulty=0,
         ServerFullName="#Rock, Dosh, Shotgun 03",
         ServerShortName="RDS3",
