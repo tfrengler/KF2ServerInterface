@@ -131,7 +131,7 @@ func main() {
 				continue
 			}
 
-			if playerCount == 0 && (Configuration.KillOnEmpty || (Configuration.KillAfter != -1 && time.Now().Local().Hour() > Configuration.KillAfter)) {
+			if playerCount == 0 && (Configuration.KillOnEmpty || (Configuration.KillAfter != -1 && time.Now().Local().Hour() >= Configuration.KillAfter)) {
 
 				printLine("Server has no players and shutdown conditions are met, killing server")
 				Error = shutdown(*ServerURL)
