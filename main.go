@@ -142,15 +142,17 @@ func main() {
 				if Configuration.KillOnEmpty {
 					KillServer = true
 				} else if Configuration.KillAfter != -1 {
-					// We need to do this potential offset check because if we spill over to the next day our server might not be killed as expected
+					// We need to do this potential offset check because if we spill over to the next day our server might not be killed as expected.
 					// If it was started at 18 and you want it to be shut down after 20 but there are still players at 02:00 at night then the comparison
 					// fails (because 2 is not greater than 20). Hence the need to add 24 to the check once the check no longer happens on the same day
 					// the server was started.
+
 					var ComparisonOffset = 0
 					if Now.Day() != TimeStarted.Day() {
 						ComparisonOffset = 24
 					}
-					KillServer = (Now.Hour() + ComparisonOffset) > (Configuration.KillAfter + KillThresholdOffset)
+					//fmt.Printf("(Now.Hour(%d) + ComparisonOffset(%d)) >= (Configuration.KillAfter(%d) + KillThresholdOffset(%d))\n", Now.Hour(), ComparisonOffset, Configuration.KillAfter, KillThresholdOffset)
+					KillServer = (Now.Hour() + ComparisonOffset) >= (Configuration.KillAfter + KillThresholdOffset)
 				}
 			}
 
@@ -251,11 +253,11 @@ func loadConfig() {
 	if Configuration.KillAfter > -1 && Configuration.KillOnEmpty {
 		fmt.Println("WARN: Configuration item 'KillAfter' and 'KillOnEmpty' are both defined. 'KillAfter' will be disabled")
 		Configuration.KillAfter = -1
-
-		// Making it so that if started the server after noon, and killAfter is between midnight and noon, then we add a 24 offset
-		// so we can spill over into the next day. That way we can start a server and tell it to be shut down at 3, meaning 03:00
-		// the following night, otherwise it will be shut down immediately, because anywhere between noon and midnight today (12-23) is greater than 3
-	} else if (Configuration.KillAfter >= 0 || Configuration.KillAfter <= 12) && TimeStarted.Hour() >= 12 {
+	}
+	// Making it so that if started the server after noon, and killAfter is between midnight and noon, then we add a 24 offset
+	// so we can spill over into the next day. That way we can start a server and tell it to be shut down at 3, meaning 03:00
+	// the following night, otherwise it will be shut down immediately, because anywhere between noon and midnight today (12-23) is greater than 3
+	if !Configuration.KillOnEmpty && (Configuration.KillAfter >= 0 && Configuration.KillAfter <= 12) && TimeStarted.Hour() >= 12 {
 		KillThresholdOffset = 24
 	}
 
